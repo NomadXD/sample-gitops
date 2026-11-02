@@ -8,6 +8,8 @@ spec:
     projectName: doclet
     resourceName: doclet-nats
   environment: development
+  # Cut by the Resource controller from the Resource (name-hash); pinning it deploys it.
+  resourceRelease: doclet-nats-844b9c778f
   retainPolicy: Delete
   resourceTypeEnvironmentConfigs:
     adminEnabled: false
