@@ -1,0 +1,116 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: EndpointType
+metadata:
+  name: http
+  namespace: gitops
+  annotations:
+    openchoreo.dev/display-name: HTTP
+    openchoreo.dev/description: Routes HTTP, GraphQL and WebSocket traffic through the data plane gateway, split across backends by weight.
+spec:
+  environmentConfigs:
+    openAPIV3Schema:
+      properties:
+        hostname:
+          description: Optional hostname to serve the endpoint on in this environment, replacing the generated one.
+          type: string
+      type: object
+  parameters:
+    openAPIV3Schema:
+      properties:
+        cors:
+          default: false
+          description: Allow browsers to call the endpoint cross-origin, e.g. from an API console.
+          type: boolean
+        pathPrefix:
+          default: /
+          description: Public path the endpoint is served under. Requests are rewritten to the backends' base path.
+          type: string
+      type: object
+  resources:
+    - id: httproute-external
+      includeWhen: ${"external" in visibility && gateway.?ingress.?external.hasValue()}
+      targetPlane: dataplane
+      template:
+        apiVersion: gateway.networking.k8s.io/v1
+        kind: HTTPRoute
+        metadata:
+          labels: '${oc_merge(metadata.labels, {"openchoreo.dev/endpoint-visibility": "external"})}'
+          name: ${oc_generate_name(metadata.name, "external")}
+          namespace: ${metadata.namespace}
+        spec:
+          hostnames: |
+            ${has(environmentConfigs.hostname)
+              ? [environmentConfigs.hostname]
+              : [gateway.ingress.external.?http, gateway.ingress.external.?https]
+                  .filter(g, g.hasValue()).map(g, g.value().host).distinct()
+                  .map(h, oc_dns_label(metadata.endpointName, metadata.environmentName, metadata.projectName, metadata.endpointNamespace) + "." + h)}
+          parentRefs:
+            - name: ${gateway.ingress.external.name}
+              namespace: ${gateway.ingress.external.namespace}
+          rules:
+            - backendRefs: '${backends.map(b, {"name": b.serviceName, "port": b.port, "weight": b.weight})}'
+              filters: |
+                ${[{"type": "URLRewrite", "urlRewrite": {"path": {"type": "ReplacePrefixMatch",
+                    "replacePrefixMatch": backends.size() > 0 ? backends[0].basePath : "/"}}}]
+                  + (parameters.cors ? [{"type": "CORS", "cors": {
+                      "allowOrigins": ["*"],
+                      "allowMethods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+                      "allowHeaders": ["*"], "exposeHeaders": ["*"], "allowCredentials": false}}] : [])}
+              matches:
+                - path:
+                    type: PathPrefix
+                    value: ${parameters.pathPrefix}
+    - id: httproute-internal
+      includeWhen: ${"internal" in visibility && gateway.?ingress.?internal.hasValue()}
+      targetPlane: dataplane
+      template:
+        apiVersion: gateway.networking.k8s.io/v1
+        kind: HTTPRoute
+        metadata:
+          labels: '${oc_merge(metadata.labels, {"openchoreo.dev/endpoint-visibility": "internal"})}'
+          name: ${oc_generate_name(metadata.name, "internal")}
+          namespace: ${metadata.namespace}
+        spec:
+          hostnames: |
+            ${[gateway.ingress.internal.?http, gateway.ingress.internal.?https]
+              .filter(g, g.hasValue()).map(g, g.value().host).distinct()
+              .map(h, oc_dns_label(metadata.endpointName, metadata.environmentName, metadata.projectName, metadata.endpointNamespace) + "." + h)}
+          parentRefs:
+            - name: ${gateway.ingress.internal.name}
+              namespace: ${gateway.ingress.internal.namespace}
+          rules:
+            - backendRefs: '${backends.map(b, {"name": b.serviceName, "port": b.port, "weight": b.weight})}'
+              filters:
+                - type: URLRewrite
+                  urlRewrite:
+                    path:
+                      replacePrefixMatch: '${backends.size() > 0 ? backends[0].basePath : "/"}'
+                      type: ReplacePrefixMatch
+              matches:
+                - path:
+                    type: PathPrefix
+                    value: ${parameters.pathPrefix}
+  urls:
+    external:
+      host: |-
+        ${has(environmentConfigs.hostname) ? environmentConfigs.hostname
+          : oc_dns_label(metadata.endpointName, metadata.environmentName, metadata.projectName, metadata.endpointNamespace) + "." + gateway.ingress.external.?https.or(gateway.ingress.external.?http).value().host}
+      includeWhen: ${gateway.?ingress.?external.?https.hasValue() || gateway.?ingress.?external.?http.hasValue()}
+      path: ${parameters.pathPrefix}
+      port: '${gateway.ingress.external.?https.or(gateway.ingress.external.?http).value().?port.orValue(gateway.ingress.external.?https.hasValue() ? 443 : 80)}'
+      scheme: '${gateway.ingress.external.?https.hasValue() ? "https" : "http"}'
+      security:
+        scheme: none
+    internal:
+      host: ${oc_dns_label(metadata.endpointName, metadata.environmentName, metadata.projectName, metadata.endpointNamespace) + "." + gateway.ingress.internal.?https.or(gateway.ingress.internal.?http).value().host}
+      includeWhen: ${gateway.?ingress.?internal.?https.hasValue() || gateway.?ingress.?internal.?http.hasValue()}
+      path: ${parameters.pathPrefix}
+      port: '${gateway.ingress.internal.?https.or(gateway.ingress.internal.?http).value().?port.orValue(gateway.ingress.internal.?https.hasValue() ? 443 : 80)}'
+      scheme: '${gateway.ingress.internal.?https.hasValue() ? "https" : "http"}'
+      security:
+        scheme: none
+  validations:
+    - message: unmanaged-http only routes HTTP, GraphQL and Websocket workload endpoints. Use grpc for gRPC backends.
+      rule: ${backends.all(b, b.protocol in ["HTTP", "GraphQL", "Websocket"])}
+    - message: All backends of an unmanaged-http Endpoint must serve under the same base path.
+      rule: ${backends.all(b, b.basePath == backends[0].basePath)}

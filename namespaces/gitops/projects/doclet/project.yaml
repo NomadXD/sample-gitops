@@ -1,0 +1,16 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Project
+metadata:
+  annotations:
+    openchoreo.dev/description: Doclet - Anonymous Real-time Collaborative Editor
+    openchoreo.dev/display-name: Doclet
+  labels:
+    openchoreo.dev/name: doclet
+  name: doclet
+  namespace: gitops
+spec:
+  deploymentPipelineRef:
+    name: standard
+  type:
+    kind: ProjectType
+    name: default

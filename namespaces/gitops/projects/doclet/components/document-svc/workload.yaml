@@ -1,0 +1,30 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Workload
+metadata:
+  name: document-svc-workload
+  namespace: gitops
+spec:
+  container:
+    env:
+    - key: DOCLET_DOCUMENT_ADDR
+      value: :8080
+    image: cr.openchoreo.dev/openchoreo/samples/doclet-document:latest
+  endpoints:
+    http:
+      protocol: HTTP
+      port: 8080
+  dependencies:
+    resources:
+      - ref: doclet-postgres
+        envBindings:
+          host: DB_HOST
+          port: DB_PORT
+          username: DB_USER
+          password: DB_PASSWORD
+          database: DB_NAME
+      - ref: doclet-nats
+        envBindings:
+          url: DOCLET_NATS_URL
+  owner:
+    componentName: document-svc
+    projectName: doclet

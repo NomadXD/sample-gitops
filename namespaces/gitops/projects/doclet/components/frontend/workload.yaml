@@ -1,0 +1,27 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Workload
+metadata:
+  name: frontend-workload
+  namespace: gitops
+spec:
+  container:
+    image: cr.openchoreo.dev/openchoreo/samples/doclet-frontend:latest
+  endpoints:
+    http:
+      protocol: HTTP
+      port: 80
+  dependencies:
+    endpoints:
+      - component: document-svc
+        name: http
+        visibility: project
+        envBindings:
+          address: DOC_SERVICE_URL
+      - component: collab-svc
+        name: http
+        visibility: project
+        envBindings:
+          address: COLLAB_SERVICE_URL
+  owner:
+    componentName: frontend
+    projectName: doclet

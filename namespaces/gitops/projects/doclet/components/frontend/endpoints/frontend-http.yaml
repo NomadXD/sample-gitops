@@ -1,0 +1,28 @@
+# Exposes the frontend component's http endpoint outside the project. The Endpoint
+# controller cuts an EndpointRelease ({name}-{hash}) for every change and, with
+# autoDeploy, binds it to the pipeline's first environment (development).
+apiVersion: openchoreo.dev/v1alpha1
+kind: Endpoint
+metadata:
+  name: frontend-http
+  namespace: gitops
+  labels:
+    # The component and workload endpoint this Endpoint was made for; while it
+    # routes only to that component, the component owns it.
+    openchoreo.dev/source-component: frontend
+    openchoreo.dev/source-endpoint: http
+spec:
+  owner:
+    projectName: doclet
+  type:
+    kind: EndpointType
+    name: http
+  visibility:
+    - external
+  backendRefs:
+    - name: frontend
+      kind: Component
+      component:
+        name: frontend
+        endpoint: http
+  autoDeploy: true

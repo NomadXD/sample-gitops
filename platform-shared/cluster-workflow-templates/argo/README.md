@@ -13,7 +13,7 @@ This directory contains [Argo Workflows ClusterWorkflowTemplates](https://argo-w
 
 ## Relationship to Workflows
 
-Each [Workflow CR](../../../namespaces/default/platform/workflows/) references a ClusterWorkflowTemplate via `workflowTemplateRef`:
+Each [Workflow CR](../../../namespaces/gitops/platform/workflows/) references a ClusterWorkflowTemplate via `workflowTemplateRef`:
 
 ```
 Workflow CR (parameters, secrets, schema)

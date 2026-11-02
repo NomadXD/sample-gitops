@@ -1,0 +1,11 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: ReleaseBinding
+metadata:
+  name: collab-svc-development
+  namespace: gitops
+spec:
+  environment: development
+  owner:
+    componentName: collab-svc
+    projectName: doclet
+  releaseName: collab-svc-20261102-1

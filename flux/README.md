@@ -94,9 +94,9 @@ spec:
 
 Update the `gitops-repo-url` parameter in each of the following workflow files to point to your fork:
 
-- [`namespaces/default/platform/workflows/docker-with-gitops.yaml`](../namespaces/default/platform/workflows/docker-with-gitops-release.yaml)
-- [`namespaces/default/platform/workflows/google-cloud-buildpacks-gitops-release.yaml`](../namespaces/default/platform/workflows/google-cloud-buildpacks-gitops-release.yaml)
-- [`namespaces/default/platform/workflows/react-gitops-release.yaml`](../namespaces/default/platform/workflows/react-gitops-release.yaml)
+- [`namespaces/gitops/platform/workflows/docker-with-gitops.yaml`](../namespaces/gitops/platform/workflows/docker-with-gitops-release.yaml)
+- [`namespaces/gitops/platform/workflows/google-cloud-buildpacks-gitops-release.yaml`](../namespaces/gitops/platform/workflows/google-cloud-buildpacks-gitops-release.yaml)
+- [`namespaces/gitops/platform/workflows/react-gitops-release.yaml`](../namespaces/gitops/platform/workflows/react-gitops-release.yaml)
 
 Commit and push all URL changes to your forked repository.
 
@@ -114,7 +114,7 @@ Generate a [GitHub Personal Access Token (PAT)](https://docs.github.com/en/authe
 
 ## Step 3: Create Git Secrets
 
-[OpenChoreo Workflows](../namespaces/default/platform/workflows/README.md) need access to your repositories for cloning source code and pushing GitOps manifests. Store your GitHub PAT in the OpenBao secret store:
+[OpenChoreo Workflows](../namespaces/gitops/platform/workflows/README.md) need access to your repositories for cloning source code and pushing GitOps manifests. Store your GitHub PAT in the OpenBao secret store:
 
 ```bash
 # Secret for cloning source repositories
@@ -185,10 +185,10 @@ kubectl annotate gitrepository -n flux-system sample-gitops \
 Within 1-2 minutes, Flux will sync the platform directory. Verify the platform resources:
 
 ```bash
-kubectl get environments              # development, staging, production
-kubectl get deploymentpipelines       # standard
-kubectl get componenttypes            # deployment/service, deployment/web-application, deployment/database, deployment/message-broker
-kubectl get projecttypes              # default
+kubectl -n gitops get environments              # development, staging, production
+kubectl -n gitops get deploymentpipelines       # standard
+kubectl -n gitops get componenttypes            # deployment/service, deployment/web-application, deployment/database, deployment/message-broker
+kubectl -n gitops get projecttypes              # default
 ```
 
 The `standard` DeploymentPipeline defines the promotion sequence: **development** -> **staging** -> **production**.
@@ -197,10 +197,10 @@ Flux then syncs the `projects/` directory. Verify that all Kustomizations are re
 
 ```bash
 kubectl get kustomization -n flux-system   # all READY=True
-kubectl get projects                       # doclet
-kubectl get projectreleasebindings         # doclet-development, doclet-staging, doclet-production
-kubectl get components                     # collab-svc, document-svc, frontend
-kubectl get resources                      # doclet-nats, doclet-postgres
+kubectl -n gitops get projects                       # doclet
+kubectl -n gitops get projectreleasebindings         # doclet-development, doclet-staging, doclet-production
+kubectl -n gitops get components                     # collab-svc, document-svc, frontend
+kubectl -n gitops get resources                      # doclet-nats, doclet-postgres
 ```
 
 If a Kustomization is not ready, its status message names the manifest that failed to apply:
@@ -225,7 +225,7 @@ apiVersion: openchoreo.dev/v1alpha1
 kind: WorkflowRun
 metadata:
   name: document-svc-manual-01
-  namespace: default
+  namespace: gitops
   labels:
     openchoreo.dev/project: "doclet"
     openchoreo.dev/component: "document-svc"
@@ -257,7 +257,7 @@ apiVersion: openchoreo.dev/v1alpha1
 kind: WorkflowRun
 metadata:
   name: collab-svc-manual-01
-  namespace: default
+  namespace: gitops
   labels:
     openchoreo.dev/project: "doclet"
     openchoreo.dev/component: "collab-svc"
@@ -289,7 +289,7 @@ apiVersion: openchoreo.dev/v1alpha1
 kind: WorkflowRun
 metadata:
   name: frontend-workflow-manual-01
-  namespace: default
+  namespace: gitops
   labels:
     openchoreo.dev/project: "doclet"
     openchoreo.dev/component: "frontend"
@@ -367,7 +367,7 @@ apiVersion: openchoreo.dev/v1alpha1
 kind: WorkflowRun
 metadata:
   name: bulk-release-manual-01
-  namespace: default
+  namespace: gitops
 spec:
   workflow:
     kind: Workflow

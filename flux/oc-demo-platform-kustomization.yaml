@@ -5,9 +5,9 @@ metadata:
   namespace: flux-system
 spec:
   interval: 5m
-  path: ./namespaces/default/platform
+  path: ./namespaces/gitops/platform
   prune: true
-  targetNamespace: default
+  targetNamespace: gitops
   sourceRef:
     kind: GitRepository
     name: sample-gitops

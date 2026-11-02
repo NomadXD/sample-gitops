@@ -41,11 +41,13 @@ The repository separates platform-level resources from application resources:
         │   │       ├── development.yaml
         │   │       ├── staging.yaml
         │   │       └── production.yaml
-        │   ├── component-types/
+        │   ├── component-types/            # allowedEndpoints: which EndpointTypes may expose them
         │   │   ├── service.yaml
         │   │   ├── webapp.yaml
         │   │   ├── database.yaml
         │   │   └── message-broker.yaml
+        │   ├── endpoint-types/
+        │   │   └── http.yaml               # How an Endpoint is routed (HTTPRoute per visibility)
         │   ├── traits/
         │   │   ├── persistent-volume.yaml
         │   │   ├── api-management.yaml
@@ -61,12 +63,16 @@ The repository separates platform-level resources from application resources:
                 └── components/
                     └── <component-name>/
                         ├── component.yaml
-                        ├── workload.yaml
+                        ├── workload.yaml       # What the component serves: protocol, port
+                        ├── endpoints/
+                        │   └── <component>-<endpoint>.yaml   # Who can reach it: visibility, EndpointType
                         ├── releases/
                         │   └── <component>-<date>-<revision>.yaml
-                        └── release-bindings/
-                            ├── <component>-development.yaml
-                            └── <component>-staging.yaml
+                        ├── release-bindings/
+                        │   ├── <component>-development.yaml
+                        │   └── <component>-staging.yaml
+                        └── endpoint-release-bindings/
+                            └── <endpoint>-staging.yaml        # Promotes an Endpoint beyond development
 ```
 
 **Key notes:**
@@ -91,7 +97,7 @@ The three build-and-release workflows (docker, buildpacks, react) clone your sou
 
 The bulk release workflow generates ReleaseBindings to promote already-built components across environments (e.g., development to staging).
 
-For detailed parameters and usage examples, see the [workflows README](./namespaces/default/platform/workflows/README.md).
+For detailed parameters and usage examples, see the [workflows README](./namespaces/gitops/platform/workflows/README.md).
 
 ---
 
@@ -105,6 +111,44 @@ Deploying a component to an environment in OpenChoreo requires the following res
 In a GitOps workflow, all resources are committed as YAML manifests. The build-and-release workflows generate these manifests and create pull requests. Once merged, the CD tool automatically synchronizes them to the cluster.
 
 To deploy the same release to additional environments, create new ReleaseBinding manifests referencing the same ComponentRelease but targeting different environments. This demonstrates the ReleaseBinding model: **one immutable release, multiple environments**.
+
+### Endpoints
+
+A Workload declares only what a component serves: each endpoint's `protocol` and `port`. Exposing it
+beyond its project is a separate resource, an **Endpoint**, which says who can reach it (`visibility`:
+`namespace`, `internal`, `external`) and how (`type`, an **EndpointType** the platform team defines).
+A ComponentType lists the EndpointTypes its components may use in `allowedEndpoints`. The component
+types here allow the `http` EndpointType and no longer render routes themselves, so a Workload's
+deprecated `visibility` exposes nothing.
+
+Endpoints follow the same release model as components, with one difference: the **Endpoint controller
+cuts the releases itself**. Every change to an Endpoint (or to its EndpointType) produces an immutable
+`EndpointRelease` named `<endpoint>-<hash>`, and with `autoDeploy: true` the controller binds it to the
+pipeline's first environment (development). EndpointReleases are therefore not committed.
+
+To promote an Endpoint, commit an `EndpointReleaseBinding` for the target environment that pins the
+release the controller cut:
+
+```bash
+kubectl -n gitops get endpoint document-svc-http -o jsonpath='{.status.latestRelease.name}'
+```
+
+```yaml
+apiVersion: openchoreo.dev/v1alpha1
+kind: EndpointReleaseBinding
+metadata:
+  name: document-svc-http-staging
+  namespace: gitops
+spec:
+  owner:
+    projectName: doclet
+    endpointName: document-svc-http
+  environment: staging
+  endpointRelease: document-svc-http-<hash>   # from the command above
+```
+
+Deploy the component to that environment first (its ReleaseBinding): an Endpoint binding waits until
+every backend it routes to is deployed there.
 
 ---
 
